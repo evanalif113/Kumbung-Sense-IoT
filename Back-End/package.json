@@ -1,0 +1,31 @@
+{
+  "name": "weather-api",
+  "version": "1.0.0",
+  "description": "simple consumer of weather API",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "run": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "mysql2": "latest"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evanalif113/weather-api-example.git"
+  },
+  "bugs": {
+    "url": "https://github.com/evanalif113/weather-api-example/issues"
+  },
+  "homepage": "https://github.com/evanalif113/weather-api-example#readme"
+}

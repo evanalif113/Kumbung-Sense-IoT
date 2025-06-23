@@ -1,0 +1,60 @@
+-- 1. Buat database
+CREATE DATABASE IF NOT EXISTS DB_JAMUR;
+USE DB_JAMUR;
+
+-- 2. Tabel Pengguna
+CREATE TABLE IF NOT EXISTS PENGGUNA (
+    id_pengguna INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 3. Tabel Sensor
+CREATE TABLE IF NOT EXISTS SENSOR (
+    id_sensor INT AUTO_INCREMENT PRIMARY KEY,
+    id_pengguna INT NOT NULL,
+    username VARCHAR(50) NOT NULL,
+    nama VARCHAR(100) NOT NULL,
+    nomor_seri VARCHAR(100) UNIQUE NOT NULL,
+    status ENUM('active', 'inactive', 'error') DEFAULT 'active',
+    tanggal_registrasi DATE DEFAULT CURRENT_DATE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_pengguna) REFERENCES Pengguna(id_pengguna) ON DELETE CASCADE
+    FOREIGN KEY (username) REFERENCES Pengguna(username) ON DELETE CASCADE
+);
+
+-- 4. Tabel Data Sensor
+CREATE TABLE IF NOT EXISTS DATA_SENSOR (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_sensor INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    temperature FLOAT,
+    humidity FLOAT,
+    light FLOAT,
+    moisture FLOAT,
+    FOREIGN KEY (id_sensor) REFERENCES SENSOR(id_sensor) ON DELETE CASCADE
+);
+
+-- 5. Tabel Aktuator (kendali perangkat via relay)
+CREATE TABLE IF NOT EXISTS AKTUATOR (
+    id_aktuator INT AUTO_INCREMENT PRIMARY KEY,
+    id_pengguna INT NOT NULL,
+    nama VARCHAR(100) NOT NULL,
+    status ENUM('aktif', 'non-aktif') DEFAULT 'aktif',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_pengguna) REFERENCES PENGGUNA(id_pengguna) ON DELETE CASCADE
+    FOREIGN KEY (username) REFERENCES Pengguna(username) ON DELETE CASCADE
+);
+
+-- 7. Tabel Log Aktuator
+CREATE TABLE IF NOT EXISTS LOG_AKTUATOR (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_aktuator INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('on', 'off') NOT NULL,
+    FOREIGN KEY (id_aktuator) REFERENCES AKTUATOR(id_aktuator) ON DELETE CASCADE
+);
