@@ -382,7 +382,7 @@ void connectWiFi() {
   bool res;
   // res = wm.autoConnect(); // auto generated AP name from chipid
   // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
-  res = wm.autoConnect("MushroomSense","jamur123"); // password protected ap
+  res = wm.autoConnect("KumbungSense-Sensor","jamur123"); // password protected ap
 
   if(!res) {
     Serial.println("Failed to connect or hit timeout");
