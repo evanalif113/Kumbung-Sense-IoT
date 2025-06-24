@@ -57,10 +57,10 @@ void initFirebase() {
     initializeApp(aClient, app, getAuth(user_auth), processData, "authTask");
     app.getApp<RealtimeDatabase>(Database);
     Database.url(DATABASE_URL);
-    String uid = app.getUid();
-    Serial.printf("Firebase UID: %s\n", uid.c_str());
     // Set a database listener
     streamClient.setSSEFilters("get,put,patch,keep-alive,cancel,auth_revoked");
+    String uid = app.getUid();
+    Serial.printf("Firebase UID: %s\n", uid.c_str());
     String dbPath = "/"+uid+"/aktuator/data/";
     Database.get(streamClient, dbPath, processData, true /* SSE mode (HTTP Streaming) */, "streamTask");
 }
