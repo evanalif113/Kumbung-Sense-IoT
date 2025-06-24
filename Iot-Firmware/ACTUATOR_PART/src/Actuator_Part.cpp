@@ -18,7 +18,7 @@ uint8_t ledPin = 2; // GPIO 2
 
 void processData(AsyncResult &aResult);
 
-SSL_CLIENT ssl_client, stream_ssl_client;
+WiFiClientSecure ssl_client, stream_ssl_client;
 
 // Firebase components
 FirebaseApp app;
@@ -29,18 +29,21 @@ RealtimeDatabase Database;
 UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD);
 
 // Timer variables for loop
-unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 10000; // 10 seconds in milliseconds
+unsigned long lastStatusTime = 0;
+const unsigned long statusInterval = 30000; // 30 detik
 
 // Declare outputs
 const int output1 = 17;
 const int output2 = 16;
 
+// Variabel UID global dan flag
+String uid;
+bool streamIsReady = false; // Flag untuk memastikan stream hanya di-setup sekali
+
 void connectWiFi() {
     WiFiManager wm;
-    // Jika sudah pernah connect, akan otomatis connect
-    // Jika belum, ESP32 akan membuat AP captive portal untuk konfigurasi WiFi
-    bool res = wm.autoConnect("ESP32-Sensing-Setup", "admin123"); // SSID dan password AP sementara
+    wm.setConfigPortalTimeout(180); // Timeout portal 3 menit
+    bool res = wm.autoConnect("ESP32-Aktuator-Setup", "admin123"); 
     if(!res) {
         Serial.println("Gagal connect WiFi, restart ESP...");
         delay(3000);
@@ -52,122 +55,131 @@ void connectWiFi() {
     }
 }
 
-void initFirebase() {
-    // Initialize Firebase
+void SetupFirebase() {
+    // Inisialisasi Firebase dan mulai proses autentikasi.
+    // Listener akan di-setup di dalam callback 'processData' setelah auth berhasil.
     initializeApp(aClient, app, getAuth(user_auth), processData, "authTask");
     app.getApp<RealtimeDatabase>(Database);
     Database.url(DATABASE_URL);
-    // Set a database listener
-    streamClient.setSSEFilters("get,put,patch,keep-alive,cancel,auth_revoked");
-    String uid = app.getUid();
-    Serial.printf("Firebase UID: %s\n", uid.c_str());
-    String dbPath = "/"+uid+"/aktuator/data/";
-    Database.get(streamClient, dbPath, processData, true /* SSE mode (HTTP Streaming) */, "streamTask");
 }
 
 void processData(AsyncResult &aResult){
-  // Exits when no result available when calling from the loop.
-  if (!aResult.isResult())
-    return;
+    // Keluar jika tidak ada hasil (dipanggil dari loop utama)
+    if (!aResult.isResult())
+        return;
 
-  if (aResult.isEvent()){
-    Firebase.printf("Event task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.eventLog().message().c_str(), aResult.eventLog().code());
-  }
+    // Menampilkan log event, debug, dan error
+    if (aResult.isEvent()){
+        Firebase.printf("Event task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.eventLog().message().c_str(), aResult.eventLog().code());
 
-  if (aResult.isDebug()){
-    Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(), aResult.debug().c_str());
-  }
+        // ---- LOGIKA BARU DIMULAI DI SINI ----
+        // Cek apakah ini event dari authTask dan apakah sudah berhasil (ready, code 10)
+        if (aResult.uid() == "authTask" && aResult.eventLog().code() == 10 /* ready */) {
+            // Cek flag agar tidak menjalankan ini berulang kali
+            if (!streamIsReady) {
+                // Dapatkan UID HANYA SETELAH auth berhasil
+                uid = app.getUid();
+                Serial.print("Authentication successful! UID: ");
+                Serial.println(uid);
 
-  if (aResult.isError()){
-    Firebase.printf("Error task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.error().message().c_str(), aResult.error().code());
-  }
+                // Buat path database yang benar menggunakan UID yang sudah didapat
+                String dbPath = "/" + uid + "/aktuator/data/";
+                Serial.print("Setting up database stream for path: ");
+                Serial.println(dbPath);
 
-  // When it receives data from the database
-  if (aResult.available()){
-    RealtimeDatabaseResult &RTDB = aResult.to<RealtimeDatabaseResult>();
-    // we received data from the streaming client
-    if (RTDB.isStream()) {
-      Serial.println("----------------------------");
-      Firebase.printf("task: %s\n", aResult.uid().c_str());
-      Firebase.printf("event: %s\n", RTDB.event().c_str());
-      Firebase.printf("path: %s\n", RTDB.dataPath().c_str());
-      Firebase.printf("etag: %s\n", RTDB.ETag().c_str());
-      Firebase.printf("data: %s\n", RTDB.to<const char *>());
-      Firebase.printf("type: %d\n", RTDB.type());
-
-      // RTDB.type = 6 means the result is a JSON : https://github.com/mobizt/FirebaseClient/blob/main/resources/docs/realtime_database_result.md#--realtime_database_data_type-type
-      // You receive a JSON when you initialize the stream
-      if (RTDB.type() == 6) {
-        Serial.println(RTDB.to<String>());
-        // Parse JSON
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, RTDB.to<String>());
-        if (error) {
-          Serial.print("deserializeJson() failed: ");
-          Serial.println(error.c_str());
-          return;
+                // Setup stream listener ke path yang benar
+                streamClient.setSSEFilters("get,put,patch,keep-alive,cancel,auth_revoked");
+                Database.get(streamClient, dbPath, processData, true /* SSE mode */, "streamTask");
+                
+                streamIsReady = true; // Set flag menjadi true
+            }
         }
-        // Iterate through JSON object
-        for (JsonPair kv : doc.as<JsonObject>()) {
-          int gpioPin = atoi(kv.key().c_str()); // Convert key (e.g., "12") to int
-          bool state = kv.value().as<bool>();
-          digitalWrite(gpioPin, state ? HIGH : LOW);
+        // ---- LOGIKA BARU SELESAI ----
+    }
+
+    if (aResult.isDebug()){
+        Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(), aResult.debug().c_str());
+    }
+
+    if (aResult.isError()){
+        Firebase.printf("Error task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.error().message().c_str(), aResult.error().code());
+    }
+
+    // Ketika menerima data dari database stream
+    if (aResult.available()){
+        RealtimeDatabaseResult &RTDB = aResult.to<RealtimeDatabaseResult>();
+        if (RTDB.isStream()) {
+            Serial.println("----------------------------");
+            Firebase.printf("task: %s\n", aResult.uid().c_str());
+            Firebase.printf("event: %s\n", RTDB.event().c_str());
+            Firebase.printf("path: %s\n", RTDB.dataPath().c_str());
+            Firebase.printf("data: %s\n", RTDB.to<const char *>());
+            Firebase.printf("type: %d\n", RTDB.type());
+
+            // Tipe 6: JSON (biasanya diterima saat pertama kali stream dimulai)
+            if (RTDB.type() == 6) {
+                JsonDocument doc;
+                DeserializationError error = deserializeJson(doc, RTDB.to<String>());
+                if (error) {
+                    Serial.print("deserializeJson() failed: ");
+                    Serial.println(error.c_str());
+                    return;
+                }
+                // Iterasi JSON dan set status awal output
+                for (JsonPair kv : doc.as<JsonObject>()) {
+                    int gpioPin = atoi(kv.key().c_str());
+                    bool state = kv.value().as<bool>();
+                    digitalWrite(gpioPin, state ? HIGH : LOW);
+                    Serial.printf("Initial state for GPIO %d set to %s\n", gpioPin, state ? "HIGH" : "LOW");
+                }
+            }
+
+            // Tipe 4 (boolean) atau 1 (integer) untuk update individu
+            if (RTDB.type() == 4 || RTDB.type() == 1){
+                // Path-nya adalah "/16" atau "/17", jadi kita ambil nomor GPIO dari path
+                int GPIO_number = RTDB.dataPath().substring(1).toInt();
+                bool state = RTDB.to<bool>();
+                digitalWrite(GPIO_number, state);
+                Serial.printf("Updating GPIO %d to %s\n", GPIO_number, state ? "HIGH" : "LOW");
+            }
         }
-      }
-
-      // RTDB.type() = 4 means the result is a boolean
-      // RTDB.type() = 1 means the result is an integer
-      // learn more here: https://github.com/mobizt/FirebaseClient/blob/main/resources/docs/realtime_database_result.md#--realtime_database_data_type-type
-      if (RTDB.type() == 4 || RTDB.type() == 1){
-        // get the GPIO number
-        int GPIO_number = RTDB.dataPath().substring(1).toInt();
-        bool state = RTDB.to<bool>();
-        digitalWrite(GPIO_number, state);
-        Serial.println("Updating GPIO State");
-      }
-
-      // The stream event from RealtimeDatabaseResult can be converted to values as following.
-      /*bool v1 = RTDB.to<bool>();
-      int v2 = RTDB.to<int>();
-      float v3 = RTDB.to<float>();
-      double v4 = RTDB.to<double>();
-      String v5 = RTDB.to<String>();
-      Serial.println(v5); */
     }
-    else{
-        Serial.println("----------------------------");
-        Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
-    }
-  }
 }
 
 void setup(){
     Serial.begin(115200);
     connectWiFi(); // Connect to Wi-Fi
-    // Declare pins as outputs
+
+    // Deklarasi pin output
     pinMode(output1, OUTPUT);
     pinMode(output2, OUTPUT);
+    pinMode(ledPin, OUTPUT);
 
     set_ssl_client_insecure_and_buffer(ssl_client);
     set_ssl_client_insecure_and_buffer(stream_ssl_client);
 
     ssl_client.setHandshakeTimeout(5);
     stream_ssl_client.setHandshakeTimeout(5);
-    initFirebase();
+
+    // Panggil fungsi setup Firebase
+    SetupFirebase();
 }
 
 void loop(){
-  // Maintain authentication and async tasks
-  app.loop();
-
-  // Check if authentication is ready
-  if (app.ready()){
-    //Do nothing - everything works with callback functions
-    unsigned long currentTime = millis();
-    if (currentTime - lastSendTime >= sendInterval){
-      // Update the last send time
-      lastSendTime = currentTime;
-      Serial.printf("Program running for %lu\n", currentTime);        
+    // Menjaga koneksi dan tugas asinkron Firebase tetap berjalan
+    app.loop();
+    
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi disconnected! Restarting...");
+        delay(1000);
+        ESP.restart();
     }
-  }
+
+    // Cetak status secara berkala untuk menunjukkan program berjalan
+    unsigned long currentTime = millis();
+    if (currentTime - lastStatusTime >= statusInterval){
+        lastStatusTime = currentTime;
+        digitalWrite(ledPin, !digitalRead(ledPin)); // Kedipkan LED
+        Serial.printf("Program running for %lu ms. UID: %s\n", currentTime, uid.c_str());
+    }
 }
