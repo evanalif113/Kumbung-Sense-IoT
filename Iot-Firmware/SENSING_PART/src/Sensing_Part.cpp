@@ -4,6 +4,7 @@
 #define USE_SHT31
 #define USE_OLED
 #define USE_NEOPIXEL
+//#define USE_DEBUG
 #define ENABLE_USER_AUTH
 #define ENABLE_DATABASE
 
@@ -277,8 +278,9 @@ void SendDataToFirebase() {
   Database.set<object_t>(aClient, dbPath.c_str(), object_t(dataTani), processData, "setTask");
 }
 
-void processData(AsyncResult &aResult)
-{
+
+void processData(AsyncResult &aResult) {
+#ifdef USE_DEBUG
     // Exits when no result available when calling from the loop.
     if (!aResult.isResult())
         return;
@@ -302,6 +304,7 @@ void processData(AsyncResult &aResult)
     {
         Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
     }
+#endif
 }
 
 void connectWiFi() {
@@ -327,7 +330,9 @@ void setup() {
     Wire.begin();
     connectWiFi();         // Gunakan WiFiManager
     initializeSensors();
+    #ifdef USE_FIREBASE
     SetupFirebase();       // Inisialisasi Firebase
+    #endif
     digitalWrite(ledPin, LOW); // Nyalakan LED jika setup berhasil
 }
 
@@ -344,8 +349,12 @@ void loop() {
     if (currentMillis - previousMillis >= interval) {
         digitalWrite(ledPin, HIGH);
         updateSensor();
-        //sendDataToSQLServer();
+        #ifdef USE_SQL
+        sendDataToSQLServer();
+        #endif
+        #ifdef USE_FIREBASE
         SendDataToFirebase(); // Kirim data ke Firebase
+        #endif
         digitalWrite(ledPin, LOW);
         previousMillis = currentMillis;
     }
