@@ -53,6 +53,14 @@ String ServerPath = "http://192.168.1.101:2518/api/data-sensor/send";
 #define USER_PASSWORD "1234567"
 
 // Pin dan LED indicator
+// uint8_t ledPin = 2; // GPIO 2 //
+
+//define pin LED
+const int ledHijau = 2;   // Ganti sesuai pin yang digunakan
+const int ledMerah = 3;
+const int ledKuning = 4;
+
+// Pin dan LED indicator
 uint8_t ledPin = 2; // GPIO 2
 
 void processData(AsyncResult &aResult);
@@ -309,45 +317,59 @@ void processData(AsyncResult &aResult) {
 
 void connectWiFi() {
     WiFiManager wm;
+    setLedStatus(false, false, true); // LED kuning nyala saat mencoba koneksi WiFi
     // Jika sudah pernah connect, akan otomatis connect
     // Jika belum, ESP32 akan membuat AP captive portal untuk konfigurasi WiFi
     bool res = wm.autoConnect("ESP32-Sensing-Setup", "admin123"); // SSID dan password AP sementara
     if(!res) {
         Serial.println("Gagal connect WiFi, restart ESP...");
+        setLedStatus(false, true, false); // LED merah nyala jika gagal koneksi
         delay(3000);
         ESP.restart();
     } else {
         Serial.println("WiFi connected!");
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
+        setLedStatus(false, false, false); // Matikan semua LED setelah berhasil konek
     }
 }
 
 void setup() {
     Serial.begin(115200);
-    pinMode(ledPin, OUTPUT);
-    digitalWrite(ledPin, HIGH); // Matikan LED awalnya
+    // pinMode(ledPin, OUTPUT);
+    // digitalWrite(ledPin, HIGH); // Matikan LED awalnya
+    pinMode(ledHijau, OUTPUT);
+    pinMode(ledMerah, OUTPUT);
+    pinMode(ledKuning, OUTPUT);
+    setLedStatus(false, false, false); // Semua LED mati awalnya
     Wire.begin();
     connectWiFi();         // Gunakan WiFiManager
     initializeSensors();
     #ifdef USE_FIREBASE
     SetupFirebase();       // Inisialisasi Firebase
     #endif
-    digitalWrite(ledPin, LOW); // Nyalakan LED jika setup berhasil
+    // digitalWrite(ledPin, LOW); // Nyalakan LED jika setup berhasil
+    setLedStatus(false, false, false); // Semua LED mati setelah setup
 }
 
 static unsigned long previousMillis;
 const unsigned long interval = 5000;
 
+// Tambahkan variabel global untuk status pengiriman data Firebase
+bool firebaseSendSuccess = false;
+bool firebaseSendError = false;
+
 void loop() {
     app.loop();
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi disconnected! Attempting to reconnect...");
+        setLedStatus(false, false, true); // LED kuning nyala saat reconnect
         connectWiFi();
     }
     unsigned long currentMillis = millis();
     if (currentMillis - previousMillis >= interval) {
-        digitalWrite(ledPin, HIGH);
+        //digitalWrite(ledPin, HIGH);
+        setLedStatus(false, false, true); // LED kuning nyala saat proses kirim data (indikasi proses)
         updateSensor();
         #ifdef USE_SQL
         sendDataToSQLServer();
@@ -355,7 +377,30 @@ void loop() {
         #ifdef USE_FIREBASE
         SendDataToFirebase(); // Kirim data ke Firebase
         #endif
-        digitalWrite(ledPin, LOW);
+        //digitalWrite(ledPin, LOW)
+
+        // Tunggu sebentar agar status LED terlihat
+        delay(500);
+
+        // Jika sukses kirim ke Firebase, LED hijau nyala sebentar
+        if (firebaseSendSuccess) {
+            setLedStatus(true, false, false);
+            delay(500);
+        }
+        // Jika gagal kirim ke Firebase, LED merah nyala sebentar
+        else if (firebaseSendError) {
+            setLedStatus(false, true, false);
+            delay(500);
+        }
+
+        setLedStatus(false, false, false); // Matikan semua LED setelah proses
         previousMillis = currentMillis;
     }
+}
+
+// Fungsi untuk mengatur status LED
+void setLedStatus(bool hijau, bool merah, bool kuning) {
+    digitalWrite(ledHijau, hijau ? HIGH : LOW);
+    digitalWrite(ledMerah, merah ? HIGH : LOW);
+    digitalWrite(ledKuning, kuning ? HIGH : LOW);
 }
