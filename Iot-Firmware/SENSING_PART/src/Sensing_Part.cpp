@@ -56,9 +56,9 @@ String ServerPath = "http://192.168.1.101:2518/api/data-sensor/send";
 // uint8_t ledPin = 2; // GPIO 2 //
 
 //define pin LED
-const int ledHijau = 2;   // Ganti sesuai pin yang digunakan
-const int ledMerah = 3;
-const int ledKuning = 4;
+const int ledHijau = 4;   // Ganti sesuai pin yang digunakan
+const int ledMerah = 16;
+const int ledKuning = 17;
 
 // // Pin dan LED indicator
 // uint8_t ledPin = 2; // GPIO 2
@@ -250,7 +250,7 @@ unsigned long getTime() {
 }
 
 // Fungsi untuk mengatur status LED
-void setLedStatus(bool hijau, bool merah, bool kuning) {
+void setLedStatus(bool hijau, bool kuning, bool merah) {
     digitalWrite(ledHijau, hijau ? HIGH : LOW);
     digitalWrite(ledMerah, merah ? HIGH : LOW);
     digitalWrite(ledKuning, kuning ? HIGH : LOW);
@@ -270,6 +270,7 @@ void SetupFirebase() {
 
 void SendDataToFirebase() {
   // Update NTP time
+  setLedStatus(true, true, false); // LED hijau nyala saat proses kirim data
   unsigned long timestamp;
   timestamp = getTime();// Get current epoch time
 
@@ -291,6 +292,7 @@ void SendDataToFirebase() {
   // Dynamically use timestamp in the path
   String dbPath = "/"+uid+"/sensor/data/" + timestamp;
   Database.set<object_t>(aClient, dbPath.c_str(), object_t(dataTani), processData, "setTask");
+  setLedStatus(true, false, false); // LED kuning nyala saat proses selesai
 }
 
 
@@ -330,14 +332,14 @@ void connectWiFi() {
     bool res = wm.autoConnect("ESP32-Sensing-Setup", "admin123"); // SSID dan password AP sementara
     if(!res) {
         Serial.println("Gagal connect WiFi, restart ESP...");
-        setLedStatus(false, true, false); // LED merah nyala jika gagal koneksi
+        setLedStatus(false, false, true); // LED merah nyala jika gagal koneksi
         delay(3000);
         ESP.restart();
     } else {
         Serial.println("WiFi connected!");
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
-        setLedStatus(false, false, false); // Matikan semua LED setelah berhasil konek
+        setLedStatus(true, false, false); // Matikan semua LED setelah berhasil konek
     }
 }
 
@@ -350,14 +352,13 @@ void setup() {
     pinMode(ledHijau, OUTPUT);
     pinMode(ledMerah, OUTPUT);
     pinMode(ledKuning, OUTPUT);
-    setLedStatus(false, false, false); // Semua LED mati awalnya
+    setLedStatus(true, true, true); // Semua LED mati awalnya
     Wire.begin();
     connectWiFi();         // Gunakan WiFiManager
     initializeSensors();
     #ifdef USE_FIREBASE
     SetupFirebase();       // Inisialisasi Firebase
     #endif
-    // digitalWrite(ledPin, LOW); // Nyalakan LED jika setup berhasil
     setLedStatus(false, false, false); // Semua LED mati setelah setup
 }
 
@@ -372,13 +373,13 @@ void loop() {
     app.loop();
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi disconnected! Attempting to reconnect...");
-        setLedStatus(false, false, true); // LED kuning nyala saat reconnect
+        setLedStatus(false, true, false); // LED kuning nyala saat reconnect
         connectWiFi();
     }
     unsigned long currentMillis = millis();
     if (currentMillis - previousMillis >= interval) {
         //digitalWrite(ledPin, HIGH);
-        setLedStatus(false, false, true); // LED kuning nyala saat proses kirim data (indikasi proses)
+        setLedStatus(true, true, false); // LED kuning nyala saat proses kirim data (indikasi proses)
         updateSensor();
         #ifdef USE_SQL
         sendDataToSQLServer();
@@ -386,23 +387,8 @@ void loop() {
         #ifdef USE_FIREBASE
         SendDataToFirebase(); // Kirim data ke Firebase
         #endif
-        //digitalWrite(ledPin, LOW)
 
-        // Tunggu sebentar agar status LED terlihat
-        delay(500);
-
-        // Jika sukses kirim ke Firebase, LED hijau nyala sebentar
-        if (firebaseSendSuccess) {
-            setLedStatus(true, false, false);
-            delay(500);
-        }
-        // Jika gagal kirim ke Firebase, LED merah nyala sebentar
-        else if (firebaseSendError) {
-            setLedStatus(false, true, false);
-            delay(500);
-        }
-
-        setLedStatus(false, false, false); // Matikan semua LED setelah proses
+        setLedStatus(true, false, false); // Matikan semua LED setelah proses
         previousMillis = currentMillis;
     }
 }
