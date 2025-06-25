@@ -65,6 +65,13 @@ const int ledKuning = 17;
 
 void processData(AsyncResult &aResult);
 
+// Fungsi untuk mengatur status LED
+void setLedStatus(bool hijau, bool kuning, bool merah) {
+    digitalWrite(ledHijau, hijau ? HIGH : LOW);
+    digitalWrite(ledMerah, merah ? HIGH : LOW);
+    digitalWrite(ledKuning, kuning ? HIGH : LOW);
+}
+
 WiFiClientSecure ssl_client;
 
 using AsyncClient = AsyncClientClass;
@@ -134,6 +141,7 @@ void initializeSensors() {
 }
 
 void updateSensor() {
+    setLedStatus(true, true, false); // LED kuning nyala saat proses pembacaan sensor
 #ifdef USE_SHT31
     float temperature = sht31.readTemperature();
     float humidity = sht31.readHumidity();
@@ -192,6 +200,7 @@ void updateSensor() {
     } else {
         Serial.println("Failed to read sensor!");
     }
+    setLedStatus(true, false, false); // Matikan semua LED setelah pembacaan sensor
 }
 
 void sendDataToSQLServer() {
@@ -249,12 +258,7 @@ unsigned long getTime() {
   return now;
 }
 
-// Fungsi untuk mengatur status LED
-void setLedStatus(bool hijau, bool kuning, bool merah) {
-    digitalWrite(ledHijau, hijau ? HIGH : LOW);
-    digitalWrite(ledMerah, merah ? HIGH : LOW);
-    digitalWrite(ledKuning, kuning ? HIGH : LOW);
-}
+
 
 void SetupFirebase() {
     configTime(0, 0, "time.google.com", "pool.ntp.org"); // Initialize NTP Client
