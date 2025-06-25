@@ -249,6 +249,13 @@ unsigned long getTime() {
   return now;
 }
 
+// Fungsi untuk mengatur status LED
+void setLedStatus(bool hijau, bool merah, bool kuning) {
+    digitalWrite(ledHijau, hijau ? HIGH : LOW);
+    digitalWrite(ledMerah, merah ? HIGH : LOW);
+    digitalWrite(ledKuning, kuning ? HIGH : LOW);
+}
+
 void SetupFirebase() {
     configTime(0, 0, "time.google.com", "pool.ntp.org"); // Initialize NTP Client
     Firebase.printf("Firebase Client v%s\n", FIREBASE_CLIENT_VERSION);
@@ -334,12 +341,7 @@ void connectWiFi() {
     }
 }
 
-// Fungsi untuk mengatur status LED
-void setLedStatus(bool hijau, bool merah, bool kuning) {
-    digitalWrite(ledHijau, hijau ? HIGH : LOW);
-    digitalWrite(ledMerah, merah ? HIGH : LOW);
-    digitalWrite(ledKuning, kuning ? HIGH : LOW);
-}
+
 
 void setup() {
     Serial.begin(115200);
