@@ -334,6 +334,13 @@ void connectWiFi() {
     }
 }
 
+// Fungsi untuk mengatur status LED
+void setLedStatus(bool hijau, bool merah, bool kuning) {
+    digitalWrite(ledHijau, hijau ? HIGH : LOW);
+    digitalWrite(ledMerah, merah ? HIGH : LOW);
+    digitalWrite(ledKuning, kuning ? HIGH : LOW);
+}
+
 void setup() {
     Serial.begin(115200);
     // pinMode(ledPin, OUTPUT);
@@ -398,9 +405,4 @@ void loop() {
     }
 }
 
-// Fungsi untuk mengatur status LED
-void setLedStatus(bool hijau, bool merah, bool kuning) {
-    digitalWrite(ledHijau, hijau ? HIGH : LOW);
-    digitalWrite(ledMerah, merah ? HIGH : LOW);
-    digitalWrite(ledKuning, kuning ? HIGH : LOW);
-}
+
