@@ -60,8 +60,8 @@ const int ledHijau = 2;   // Ganti sesuai pin yang digunakan
 const int ledMerah = 3;
 const int ledKuning = 4;
 
-// Pin dan LED indicator
-uint8_t ledPin = 2; // GPIO 2
+// // Pin dan LED indicator
+// uint8_t ledPin = 2; // GPIO 2
 
 void processData(AsyncResult &aResult);
 
