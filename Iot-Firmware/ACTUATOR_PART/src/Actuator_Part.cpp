@@ -155,6 +155,9 @@ void setup(){
     pinMode(output2, OUTPUT);
     pinMode(ledPin, OUTPUT);
 
+    digitalWrite(output1, HIGH);
+    digitalWrite(output2, HIGH);
+
     set_ssl_client_insecure_and_buffer(ssl_client);
     set_ssl_client_insecure_and_buffer(stream_ssl_client);
 
