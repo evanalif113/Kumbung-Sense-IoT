@@ -39,9 +39,9 @@ uint8_t id_sensor = 2;
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-#define INDI_PIN 5
+//#define INDI_PIN 5
 #define MOISTURE_PIN 34
-#define TRIGGER_PIN 18
+#define TRIGGER_PIN 0
 
 // wifimanager can run in a blocking mode or a non blocking mode
 // Be sure to know how to process loops with no delay() if using non blocking
@@ -351,8 +351,6 @@ void processData(AsyncResult &aResult) {
 }
 
 void connectWiFi() {
-    setLedStatus(true, false, true);
-pinMode(TRIGGER_PIN, INPUT);
   
   // wm.resetSettings(); // wipe settings
 
@@ -417,11 +415,9 @@ pinMode(TRIGGER_PIN, INPUT);
     //if you get here you have connected to the WiFi    
     Serial.println("connected...yeey :)");
   }
-  setLedStatus(true,false, false);
 }
 
 void checkButton(){
-  // check for button press
   if ( digitalRead(TRIGGER_PIN) == LOW ) {
     // poor mans debounce/press-hold, code not ideal for production
     delay(50);
@@ -461,15 +457,16 @@ void setup() {
     pinMode(ledHijau, OUTPUT);
     pinMode(ledMerah, OUTPUT);
     pinMode(ledKuning, OUTPUT);
+    pinMode(TRIGGER_PIN, INPUT); // Set trigger pin as input with pull-up resistor
     setLedStatus(true, true, true); // Semua LED mati awalnya
     delay(5000); // Tunggu 1 detik untuk memastikan LED mati
     setLedStatus(false, false, false); // Semua LED mati setelah setup
     Wire.begin();
     connectWiFi();         // Gunakan WiFiManager
-    setLedStatus(true, true, true); // Semua LED mati awalnya
+    setLedStatus(true, true, false); // Semua LED mati awalnya
     initializeSensors();
     setLedStatus(false, false, false); // Semua LED mati setelah setup
-    setLedStatus(true, true, true); // Semua LED mati awalnya
+    setLedStatus(true, true, false); // Semua LED mati awalnya
     #ifdef USE_FIREBASE
     SetupFirebase();       // Inisialisasi Firebase
     setLedStatus(false, false, false); // Semua LED mati setelah setup
@@ -486,6 +483,7 @@ void loop() {
     if(wm_nonblocking) wm.process();
     checkButton();
     if (WiFi.status() != WL_CONNECTED) {
+        setLedStatus(true, false, true); // LED merah dan kuning nyala saat WiFi terputus
         Serial.println("WiFi disconnected! Attempting to reconnect...");
         connectWiFi();
     }
