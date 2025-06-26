@@ -1,0 +1,432 @@
+/**
+ * Ini adalah semacam unit test untuk DEV untuk saat ini
+ * Ini berisi banyak metode publik
+ *
+ */
+
+// Sertakan Pustaka
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+#include <time.h>
+#include <stdio.h>
+
+#define USEOTA
+// aktifkan OTA
+#ifdef USEOTA
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
+#endif
+
+// Deklarasi Fungsi
+void setup();
+void loop();
+void saveWifiCallback();
+void configModeCallback(WiFiManager *myWiFiManager);
+void saveParamCallback();
+void handleRoute();
+void handleNotFound();
+void bindServerCallback();
+void handlePreOtaUpdateCallback();
+void wifiInfo();
+void getTime();
+void debugchipid();
+
+// Konstanta dan Variabel Global
+const char* modes[] = { "NULL", "STA", "AP", "STA+AP" };
+unsigned long mtime = 0;
+
+WiFiManager wm;
+
+// BENDERA OPSI UJI
+bool TEST_CP          = false;  // selalu mulai configportal, bahkan jika ap ditemukan
+int  TESP_CP_TIMEOUT  = 90;     // uji batas waktu cp
+
+bool TEST_NET         = true;   // lakukan tes jaringan setelah terhubung, (mendapatkan waktu ntp)
+bool ALLOWONDEMAND    = true;   // aktifkan sesuai permintaan
+int  ONDDEMANDPIN     = 0;      // gpio untuk tombol
+bool WMISBLOCKING     = true;   // gunakan mode pemblokiran atau non-pemblokiran, parameter non-global tidak akan berfungsi dalam mode non-pemblokiran
+
+uint8_t BUTTONFUNC    = 1;      // 0 resetsettings, 1 configportal, 2 autoconnect
+
+// char ssid[] = "*************";   // SSID jaringan Anda (nama)
+// char pass[] = "********";       // kata sandi jaringan Anda
+
+// Implementasi Fungsi
+
+/**
+ * @brief Fungsi setup, dijalankan sekali saat startup.
+ */
+void setup() {
+  // WiFi.mode(WIFI_STA); // secara eksplisit atur mode, esp dapat default ke STA+AP
+
+  // letakkan kode setup Anda di sini, untuk dijalankan sekali:
+  Serial.begin(115200);
+  delay(3000);
+  // Serial.setDebugOutput(true);
+
+  // WiFi.setTxPower(WIFI_POWER_8_5dBm);
+
+  Serial.println("\n Memulai");
+  // WiFi.setSleepMode(WIFI_NONE_SLEEP); // nonaktifkan tidur, dapat meningkatkan stabilitas ap
+
+  Serial.println("Error - TEST");
+  Serial.println("Information- - TEST");
+
+  Serial.println("[ERROR]   TEST");
+  Serial.println("[INFORMATION] TEST");
+
+  // WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN); // wifi_scan_method_t scanMethod
+  // WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL); // wifi_sort_method_t sortMethod - WIFI_CONNECT_AP_BY_SIGNAL,WIFI_CONNECT_AP_BY_SECURITY
+  // WiFi.setMinSecurity(WIFI_AUTH_WPA2_PSK);
+
+  wm.setDebugOutput(true, WM_DEBUG_DEV);
+  wm.debugPlatformInfo();
+
+  // reset pengaturan - untuk pengujian
+  // wm.resetSettings();
+  // wm.erase();
+
+  // atur beberapa parameter
+  WiFiManagerParameter custom_html("<p style=\"color:pink;font-weight:Bold;\">Ini Adalah HTML Kustom</p>"); // hanya html kustom
+  WiFiManagerParameter custom_mqtt_server("server", "server mqtt", "", 40);
+  WiFiManagerParameter custom_mqtt_port("port", "port mqtt", "", 6);
+  WiFiManagerParameter custom_token("api_token", "token api", "", 16);
+  WiFiManagerParameter custom_tokenb("token tidak valid", "token tidak valid", "", 0); // id tidak valid, tidak boleh berisi spasi
+  WiFiManagerParameter custom_ipaddress("input_ip", "input IP", "", 15,"pattern='\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}'"); // atribut input kustom (masker ip)
+  WiFiManagerParameter custom_input_type("input_pwd", "input pass", "", 15,"type='password'"); // atribut input kustom (masker ip)
+
+  const char _customHtml_checkbox[] = "type=\"checkbox\"";
+  WiFiManagerParameter custom_checkbox("my_checkbox", "Kotak Centang Saya", "T", 2, _customHtml_checkbox, WFM_LABEL_AFTER);
+
+  const char *bufferStr = R"(
+  <br/>
+  <p>Pilih Pilihan</p>
+  <input style='display: inline-block;' type='radio' id='choice1' name='program_selection' value='1'>
+  <label for='choice1'>Pilihan1</label><br/>
+  <input style='display: inline-block;' type='radio' id='choice2' name='program_selection' value='2'>
+  <label for='choice2'>Pilihan2</label><br/>
+
+  <br/>
+  <label for='input_select'>Label untuk Input Pilih</label>
+  <select name="input_select" id="input_select" class="button">
+  <option value="0">Opsi 1</option>
+  <option value="1" selected>Opsi 2</option>
+  <option value="2">Opsi 3</option>
+  <option value="3">Opsi 4</option>
+  </select>
+  )";
+
+  WiFiManagerParameter custom_html_inputs(bufferStr);
+
+  // callbacks
+  wm.setAPCallback(configModeCallback);
+  wm.setWebServerCallback(bindServerCallback);
+  wm.setSaveConfigCallback(saveWifiCallback);
+  wm.setSaveParamsCallback(saveParamCallback);
+  wm.setPreOtaUpdateCallback(handlePreOtaUpdateCallback);
+
+  // tambahkan semua parameter Anda di sini
+  wm.addParameter(&custom_html);
+  wm.addParameter(&custom_mqtt_server);
+  wm.addParameter(&custom_mqtt_port);
+  wm.addParameter(&custom_token);
+  wm.addParameter(&custom_tokenb);
+  wm.addParameter(&custom_ipaddress);
+  wm.addParameter(&custom_checkbox);
+  wm.addParameter(&custom_input_type);
+  wm.addParameter(&custom_html_inputs);
+
+  // atur nilai nanti jika Anda mau
+  custom_html.setValue("test",4);
+  custom_token.setValue("test",4);
+
+  // atur konten head html kustom, di dalam <head>
+  const char* menuhtml = "<form action='/custom' method='get'><button>Kustom</button></form><br/>\n";
+  wm.setCustomMenuHTML(menuhtml);
+
+  // balikkan tema, gelap
+  wm.setDarkMode(true);
+
+  // tampilkan RSSI pemindaian sebagai persentase, bukan grafik kekuatan sinyal
+  // wm.setScanDispPerc(true);
+
+  /*
+   Atur menu kustom melalui menu[] atau vektor
+   const char* menu[] = {"wifi","wifinoscan","info","param","close","sep","erase","restart","exit"};
+   wm.setMenu(menu,9); // larik menu kustom harus menyediakan panjang
+  */
+
+  std::vector<const char *> menu = {"wifi","wifinoscan","info","param","custom","close","sep","erase","update","restart","exit"};
+  // wm.setMenu(menu); // menu kustom, berikan vektor
+
+  // wm.setParamsPage(true); // pindahkan parameter ke halaman terpisah, bukan wifi, jangan gabungkan dengan setmenu!
+
+  // atur ip statis STA
+  // wm.setSTAStaticIPConfig(IPAddress(10,0,1,99), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+  // wm.setShowStaticFields(false);
+  // wm.setShowDnsFields(false);
+
+  // atur ip statis AP
+  // wm.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+
+  // atur negara
+  // wm.setCountry("US"); // macet di esp32 2.0
+
+  // atur Nama Host
+  // wm.setHostname(("WM_"+wm.getDefaultAPName()).c_str());
+
+  // atur saluran kustom
+  // wm.setWiFiAPChannel(13);
+
+  // atur AP tersembunyi
+  // wm.setAPHidden(true);
+
+  // tampilkan kata sandi secara publik dalam formulir
+  // wm.setShowPassword(true);
+
+  // mengatur apakah configportal wm adalah loop pemblokiran (legacy) atau tidak, gunakan wm.process() di loop jika salah
+  if(!WMISBLOCKING){
+    wm.setConfigPortalBlocking(false);
+  }
+
+  // mengatur batas waktu hingga portal konfigurasi dimatikan
+  wm.setConfigPortalTimeout(TESP_CP_TIMEOUT);
+
+  // atur kualitas min untuk ditampilkan dalam daftar web, default 8%
+  // wm.setMinimumSignalQuality(50);
+
+  // atur batas waktu koneksi
+  // wm.setConnectTimeout(20);
+
+  // atur coba lagi koneksi wifi
+  // wm.setConnectRetries(2);
+
+  // hubungkan setelah sakelar simpan portal
+  // wm.setSaveConnect(false); // jangan hubungkan, hanya simpan
+
+  // wm.setCleanConnect(true); // putuskan sambungan sebelum menyambung, sambungan bersih
+
+  wm.setBreakAfterConfig(true); // diperlukan untuk menggunakan saveWifiCallback
+
+  // atur port webserver kustom, portal captive otomatis tidak berfungsi dengan port kustom!
+  // wm.setHttpPort(8080);
+
+  // untuk memuat autoconnect dengan kredensial
+  // wm.preloadWiFi("ssid","password");
+
+  wifiInfo();
+
+  if(!wm.autoConnect("WM_AutoConnectAP","12345678")) {
+    Serial.println("gagal terhubung dan mencapai batas waktu");
+  }
+  else if(TEST_CP) {
+    // mulai configportal selalu
+    delay(1000);
+    Serial.println("TEST_CP DIAKTIFKAN");
+    wm.setConfigPortalTimeout(TESP_CP_TIMEOUT);
+    wm.startConfigPortal("WM_ConnectAP","12345678");
+  }
+  else {
+    // jika Anda sampai di sini, Anda telah terhubung ke WiFi
+     Serial.println("terhubung...hore :)");
+  }
+
+  wifiInfo();
+  pinMode(ONDDEMANDPIN, INPUT_PULLUP);
+
+  #ifdef USEOTA
+    ArduinoOTA.begin();
+  #endif
+}
+
+/**
+ * @brief Fungsi loop utama, dijalankan berulang kali.
+ */
+void loop() {
+  if(!WMISBLOCKING){
+    wm.process();
+  }
+
+  #ifdef USEOTA
+  ArduinoOTA.handle();
+  #endif
+
+  // apakah portal konfigurasi diminta?
+  if (ALLOWONDEMAND && digitalRead(ONDDEMANDPIN) == LOW ) {
+    delay(100);
+    if ( digitalRead(ONDDEMANDPIN) == LOW || BUTTONFUNC == 2){
+      Serial.println("TOMBOL DITEKAN");
+
+      // reset/reboot tombol
+      if(BUTTONFUNC == 0){
+        wm.resetSettings();
+        wm.reboot();
+        delay(200);
+        return;
+      }
+
+      // mulai configportal
+      if(BUTTONFUNC == 1){
+        if (!wm.startConfigPortal("OnDemandAP","12345678")) {
+          Serial.println("gagal terhubung dan mencapai batas waktu");
+          delay(3000);
+        }
+        return;
+      }
+
+      // uji autoconnect sebagai koneksi ulang dll.
+      if(BUTTONFUNC == 2){
+        wm.setConfigPortalTimeout(TESP_CP_TIMEOUT);
+        wm.autoConnect();
+        return;
+      }
+    }
+    else {
+      // jika Anda sampai di sini, Anda telah terhubung ke WiFi
+      Serial.println("terhubung...hore :)");
+      getTime();
+    }
+  }
+
+  // setiap 10 detik
+  if(millis()-mtime > 10000 ){
+    if(WiFi.status() == WL_CONNECTED){
+      getTime();
+    }
+    else Serial.println("Tidak Ada Wifi");
+    mtime = millis();
+  }
+  // letakkan kode utama Anda di sini, untuk dijalankan berulang kali:
+  delay(100);
+}
+
+/**
+ * @brief Callback yang dipanggil saat pengaturan WiFi disimpan.
+ */
+void saveWifiCallback(){
+  Serial.println("[CALLBACK] saveCallback diaktifkan");
+}
+
+/**
+ * @brief Callback yang dipanggil saat WiFiManager memasuki mode konfigurasi.
+ * @param myWiFiManager Penunjuk ke instance WiFiManager.
+ */
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println("[CALLBACK] configModeCallback diaktifkan");
+  // myWiFiManager->setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+  // Serial.println(WiFi.softAPIP());
+  // jika Anda menggunakan SSID yang dibuat secara otomatis, cetak
+  // Serial.println(myWiFiManager->getConfigPortalSSID());
+  //
+  // esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20);
+}
+
+/**
+ * @brief Callback yang dipanggil saat parameter kustom disimpan.
+ */
+void saveParamCallback(){
+  Serial.println("[CALLBACK] saveParamCallback diaktifkan");
+  // wm.stopConfigPortal();
+}
+
+/**
+ * @brief Menangani rute HTTP kustom.
+ */
+void handleRoute(){
+  Serial.println("[HTTP] tangani rute kustom");
+  wm.server->send(200, "text/plain", "halo dari kode pengguna");
+}
+
+/**
+ * @brief Mengganti penangan rute default (misalnya, untuk menonaktifkan endpoint).
+ */
+void handleNotFound(){
+  Serial.println("[HTTP] ganti rute penanganan");
+  wm.handleNotFound();
+}
+
+/**
+ * @brief Mengikat server web ke penangan rute kustom.
+ */
+void bindServerCallback(){
+  wm.server->on("/custom",handleRoute);
+  // Anda dapat mengganti titik akhir rute wm, saya belum menemukan cara untuk menghapus penangan, tetapi ini akan memungkinkan Anda menonaktifkannya atau menambahkan otentikasi dll.
+  // wm.server->on("/info",handleNotFound);
+  // wm.server->on("/update",handleNotFound);
+  wm.server->on("/erase",handleNotFound); // nonaktifkan penghapusan
+}
+
+/**
+ * @brief Callback yang dipanggil sebelum pembaruan OTA dimulai.
+ */
+void handlePreOtaUpdateCallback(){
+  Update.onProgress([](unsigned int progress, unsigned int total) {
+        Serial.printf("Kemajuan KUSTOM: %u%%\r", (progress / (total / 100)));
+  });
+}
+
+/**
+ * @brief Mencetak informasi debug tentang status WiFi.
+ */
+void wifiInfo(){
+  // dapat berisi sampah di esp32 jika wifi belum siap
+  Serial.println("[WIFI] DEBUG INFO WIFI");
+  WiFi.printDiag(Serial);
+  Serial.println("[WIFI] MODE: " + (String)(wm.getModeString(WiFi.getMode())));
+  Serial.println("[WIFI] DISIMPAN: " + (String)(wm.getWiFiIsSaved() ? "YA" : "TIDAK"));
+  Serial.println("[WIFI] SSID: " + (String)wm.getWiFiSSID());
+  Serial.println("[WIFI] PASS: " + (String)wm.getWiFiPass());
+  // Serial.println("[WIFI] HOSTNAME: " + (String)WiFi.getHostname());
+}
+
+/**
+ * @brief Mendapatkan dan mencetak waktu saat ini dari server NTP.
+ */
+void getTime() {
+  int tz           = -5;
+  int dst          = 0;
+  time_t now       = time(nullptr);
+  unsigned timeout = 5000; // coba untuk batas waktu
+  unsigned start   = millis();
+  configTime(tz * 3600, dst * 3600, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Menunggu sinkronisasi waktu NTP: ");
+  while (now < 8 * 3600 * 2 ) { // apa ini ?
+    delay(100);
+    Serial.print(".");
+    now = time(nullptr);
+    if((millis() - start) > timeout){
+      Serial.println("\n[ERROR] Gagal mendapatkan waktu NTP.");
+      return;
+    }
+  }
+  Serial.println("");
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  Serial.print("Waktu saat ini: ");
+  Serial.print(asctime(&timeinfo));
+}
+
+/**
+ * @brief Fungsi debug untuk ID chip dan mode WiFi.
+ */
+void debugchipid(){
+  // WiFi.mode(WIFI_STA);
+  // WiFi.printDiag(Serial);
+  // Serial.println(modes[WiFi.getMode()]);
+
+  // ESP.eraseConfig();
+  // wm.resetSettings();
+  // wm.erase(true);
+  WiFi.mode(WIFI_AP);
+  // WiFi.softAP();
+  WiFi.enableAP(true);
+  delay(500);
+  // esp_wifi_start();
+  delay(1000);
+  WiFi.printDiag(Serial);
+  delay(60000);
+  ESP.restart();
+
+  // AP esp_267751
+  // 507726A4AE30
+  // ESP32 Chip ID = 507726A4AE30
+}
