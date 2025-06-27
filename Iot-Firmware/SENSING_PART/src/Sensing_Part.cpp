@@ -1,6 +1,6 @@
 //#define USE_SQL
 #define USE_FIREBASE
-//#define USE_BH1750
+#define USE_BH1750
 #define USE_SHT31
 //#define USE_OLED
 //#define USE_DEBUG
