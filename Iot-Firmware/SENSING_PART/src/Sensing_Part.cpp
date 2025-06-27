@@ -3,7 +3,6 @@
 //#define USE_BH1750
 #define USE_SHT31
 //#define USE_OLED
-//#define USE_NEOPIXEL
 //#define USE_DEBUG
 #define ENABLE_USER_AUTH
 #define ENABLE_DATABASE
@@ -25,10 +24,6 @@
 
 #ifdef USE_BH1750
     #include <BH1750.h>
-#endif
-
-#ifdef USE_NEOPIXEL
-    #include <Adafruit_NeoPixel.h>
 #endif
 
 #ifdef USE_SQL
@@ -101,14 +96,10 @@ Adafruit_SHT31 sht31 = Adafruit_SHT31();
 BH1750 light;
 #endif
 
-#ifdef USE_NEOPIXEL
-Adafruit_NeoPixel strip(1, INDI_PIN, NEO_GRB + NEO_KHZ800);
-#endif
-
 // Global variables to store latest sensor readings
 float latestTemperature = 0;
 float latestHumidity = 0;
-int latestMoisture = 0;
+float latestMoisture = 0; // ubah ke float agar bisa simpan persen
 float latestLight = 0;
 
 String getParam(String name){
@@ -126,13 +117,6 @@ void saveParamCallback(){
 }
 
 void initializeSensors() {
-#ifdef USE_NEOPIXEL
-    strip.begin();
-    strip.setPixelColor(0, strip.Color(0, 255, 255));
-    strip.setBrightness(100);
-    strip.show();
-#endif
-
 #ifdef USE_SHT31
     if (!sht31.begin(0x44)) {
         Serial.println("Could not find SHT31 sensor!");
@@ -180,11 +164,12 @@ void updateSensor() {
 #endif
 
     int moistureValue = analogRead(MOISTURE_PIN);
+    float moisturePercent = 100.0 - ((moistureValue / 4095.0) * 100.0); // 0 = 100% (basah), 4095 = 0% (kering)
 
     if (!isnan(temperature) && !isnan(humidity) && !isnan(lux)) {
         latestTemperature = temperature;
         latestHumidity = humidity;
-        latestMoisture = moistureValue;
+        latestMoisture = moisturePercent; // simpan dalam persen
         latestLight = lux;
 
         Serial.print("Temperature: ");
@@ -197,7 +182,8 @@ void updateSensor() {
         Serial.print(lux);
         Serial.println(" lx");
         Serial.print("Soil Moisture: ");
-        Serial.println(moistureValue);
+        Serial.print(moisturePercent);
+        Serial.println(" %");
 
 #ifdef USE_OLED
         display.clearDisplay();
@@ -216,7 +202,8 @@ void updateSensor() {
         display.print(lux);
         display.println(" lux");
         display.print("Moist: ");
-        display.println(moistureValue);
+        display.print(moisturePercent);
+        display.println(" %");
         display.display();
 #endif
     } else {
@@ -248,19 +235,9 @@ void sendDataToSQLServer() {
         Serial.print("HTTP Response code: ");
         Serial.println(httpResponseCode);
         if (httpResponseCode == 200) {
-#ifdef USE_NEOPIXEL
-            strip.setPixelColor(0, strip.Color(0, 255, 0));
-            strip.setBrightness(100);
-            strip.show();
-#endif
             Serial.println("Data berhasil dikirim ke server!");
         }
     } else {
-#ifdef USE_NEOPIXEL
-        strip.setPixelColor(0, strip.Color(255, 0, 0));
-        strip.setBrightness(100);
-        strip.show();
-#endif
         Serial.print("Error code: ");
         Serial.println(httpResponseCode);
         Serial.println("Possible reasons: server not running, wrong URL, firewall, or network issues.");
