@@ -328,14 +328,12 @@ void processData(AsyncResult &aResult) {
 }
 
 void connectWiFi() {
-  
   // wm.resetSettings(); // wipe settings
 
   if(wm_nonblocking) wm.setConfigPortalBlocking(false);
 
   // add a custom input field
   int customFieldLength = 40;
-
 
   // new (&custom_field) WiFiManagerParameter("customfieldid", "Custom Field Label", "Custom Field Value", customFieldLength,"placeholder=\"Custom Field Placeholder\"");
   
@@ -401,7 +399,7 @@ void checkButton(){
     if( digitalRead(TRIGGER_PIN) == LOW ){
       Serial.println("Button Pressed");
       // still holding button for 3000 ms, reset settings, code not ideaa for production
-      delay(3000); // reset delay hold
+      delay(10000); // reset delay hold
       if( digitalRead(TRIGGER_PIN) == LOW ){
         Serial.println("Button Held");
         Serial.println("Erasing Config, restarting");
@@ -413,7 +411,7 @@ void checkButton(){
       Serial.println("Starting config portal");
       wm.setConfigPortalTimeout(120);
       
-      if (!wm.startConfigPortal("MushroomSense","jamur123")) {
+      if (!wm.startConfigPortal("KumbungSense-Sensor","jamur123")) {
         Serial.println("failed to connect or hit timeout");
         delay(3000);
         // ESP.restart();
@@ -424,8 +422,6 @@ void checkButton(){
     }
   }
 }
-
-
 
 void setup() {
     Serial.begin(115200);
