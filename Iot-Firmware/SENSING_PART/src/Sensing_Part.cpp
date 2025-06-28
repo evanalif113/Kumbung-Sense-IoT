@@ -450,18 +450,26 @@ void setup() {
 static unsigned long previousMillis;
 const unsigned long interval = 30000;
 
+static unsigned long indicatorMillis;
+const unsigned long indicatorInterval = 1000; // Interval untuk indikator LED
 
 void loop() {
     app.loop();
     if(wm_nonblocking) wm.process();
     checkButton();
     if (WiFi.status() != WL_CONNECTED) {
-        setLedStatus(true, false, true); // LED merah dan kuning nyala saat WiFi terputus
+        setLedStatus(true, false, true); // LED merah nyala saat WiFi terputus
         Serial.println("WiFi disconnected! Attempting to reconnect...");
         connectWiFi();
     }
 
     unsigned long currentMillis = millis();
+    if (currentMillis - indicatorMillis >= indicatorInterval) {
+        setLedStatus(true, false, false); // LED merah nyala sebagai indikator
+        setLedStatus(false, false, false); // Matikan LED setelah indikator
+        indicatorMillis = currentMillis;
+    }
+
     if (currentMillis - previousMillis >= interval) {
         updateSensor();
         #ifdef USE_SQL
