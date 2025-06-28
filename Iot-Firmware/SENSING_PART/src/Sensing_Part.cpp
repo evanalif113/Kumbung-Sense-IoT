@@ -40,7 +40,7 @@ uint8_t id_sensor = 2;
 
 // wifimanager can run in a blocking mode or a non blocking mode
 // Be sure to know how to process loops with no delay() if using non blocking
-bool wm_nonblocking = false; // change to true to use non blocking
+bool wm_nonblocking = true; // change to true to use non blocking
 
 WiFiManager wm; // global wm instance
 WiFiManagerParameter custom_field; // global param ( for non blocking w params )
@@ -450,9 +450,6 @@ void setup() {
 static unsigned long previousMillis;
 const unsigned long interval = 30000;
 
-static unsigned long indicatorMillis;
-const unsigned long indicatorInterval = 1000; // Interval untuk indikator LED
-
 void loop() {
     app.loop();
     if(wm_nonblocking) wm.process();
@@ -464,11 +461,6 @@ void loop() {
     }
 
     unsigned long currentMillis = millis();
-    if (currentMillis - indicatorMillis >= indicatorInterval) {
-        setLedStatus(true, false, false); // LED merah nyala sebagai indikator
-        setLedStatus(false, false, false); // Matikan LED setelah indikator
-        indicatorMillis = currentMillis;
-    }
 
     if (currentMillis - previousMillis >= interval) {
         updateSensor();
