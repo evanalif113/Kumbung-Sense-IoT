@@ -72,7 +72,6 @@ void processData(AsyncResult &aResult){
     if (aResult.isEvent()){
         Firebase.printf("Event task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.eventLog().message().c_str(), aResult.eventLog().code());
 
-        // ---- LOGIKA BARU DIMULAI DI SINI ----
         // Cek apakah ini event dari authTask dan apakah sudah berhasil (ready, code 10)
         if (aResult.uid() == "authTask" && aResult.eventLog().code() == 10 /* ready */) {
             // Cek flag agar tidak menjalankan ini berulang kali
@@ -94,7 +93,6 @@ void processData(AsyncResult &aResult){
                 streamIsReady = true; // Set flag menjadi true
             }
         }
-        // ---- LOGIKA BARU SELESAI ----
     }
 
     if (aResult.isDebug()){
@@ -129,8 +127,10 @@ void processData(AsyncResult &aResult){
                 for (JsonPair kv : doc.as<JsonObject>()) {
                     int gpioPin = atoi(kv.key().c_str());
                     bool state = kv.value().as<bool>();
-                    digitalWrite(gpioPin, state ? HIGH : LOW);
-                    Serial.printf("Initial state for GPIO %d set to %s\n", gpioPin, state ? "HIGH" : "LOW");
+                    // --- LOGIKA DIBALIK DI SINI ---
+                    // state true (1) -> LOW (OFF), state false (0) -> HIGH (ON)
+                    digitalWrite(gpioPin, state ? LOW : HIGH);
+                    Serial.printf("Initial state for GPIO %d set to %s (Inverted Logic)\n", gpioPin, state ? "OFF (LOW)" : "ON (HIGH)");
                 }
             }
 
@@ -139,8 +139,10 @@ void processData(AsyncResult &aResult){
                 // Path-nya adalah "/16" atau "/17", jadi kita ambil nomor GPIO dari path
                 int GPIO_number = RTDB.dataPath().substring(1).toInt();
                 bool state = RTDB.to<bool>();
-                digitalWrite(GPIO_number, state);
-                Serial.printf("Updating GPIO %d to %s\n", GPIO_number, state ? "HIGH" : "LOW");
+                // --- LOGIKA DIBALIK DI SINI ---
+                // state true (1) -> LOW (OFF), state false (0) -> HIGH (ON)
+                digitalWrite(GPIO_number, state ? LOW : HIGH);
+                Serial.printf("Updating GPIO %d to %s (Inverted Logic)\n", GPIO_number, state ? "OFF (LOW)" : "ON (HIGH)");
             }
         }
     }
@@ -153,8 +155,10 @@ void setup(){
     // Deklarasi pin output
     pinMode(output1, OUTPUT);
     pinMode(output2, OUTPUT);
+    
     pinMode(ledPin, OUTPUT);
 
+    // Set kondisi awal ke OFF (HIGH dalam logika terbalik)
     digitalWrite(output1, HIGH);
     digitalWrite(output2, HIGH);
 
