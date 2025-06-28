@@ -448,7 +448,7 @@ void setup() {
 }
 
 static unsigned long previousMillis;
-const unsigned long interval = 5000;
+const unsigned long interval = 30000;
 
 
 void loop() {
