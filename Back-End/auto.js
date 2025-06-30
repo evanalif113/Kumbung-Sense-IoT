@@ -1,15 +1,15 @@
-var admin = require("firebase-admin");
+var firebase = require("firebase-admin");
 
 // Ganti "./kunci_firebase.json" dengan path yang benar ke file kunci layanan Anda
 var serviceAccount = require("./kunci_firebase.json");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+firebase.initializeApp({
+  credential: firebase.credential.cert(serviceAccount),
   databaseURL: "https://kumbung-sense-default-rtdb.asia-southeast1.firebasedatabase.app"
 });
 
 // Dapatkan referensi ke database
-const db = admin.database();
+const db = firebase.database();
 const UID = 'JU3dPIvArGbuoRUywdcTmdVkQRr2'; // Simpan ID perangkat agar mudah diubah
 
 // ======================================================================
