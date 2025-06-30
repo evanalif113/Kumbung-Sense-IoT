@@ -8,96 +8,140 @@ firebase.initializeApp({
   databaseURL: "https://kumbung-sense-default-rtdb.asia-southeast1.firebasedatabase.app"
 });
 
-// Dapatkan referensi ke database
 const db = firebase.database();
-const UID = 'JU3dPIvArGbuoRUywdcTmdVkQRr2'; // Simpan ID perangkat agar mudah diubah
+const UID = 'JU3dPIvArGbuoRUywdcTmdVkQRr2';
 
 // ======================================================================
-// LISTENER 1: DATA SENSOR TERBARU
+// ALGORITMA KONTROL OTOMATIS
 // ======================================================================
 
-// Tentukan path ke node 'data' yang berisi semua log sensor
-const sensorDataRef = db.ref(`${UID}/sensor/data`);
+// 1. Variabel untuk menyimpan state dari Firebase secara real-time
+let currentThresholds = null;
+let currentActuatorStates = null;
+let isAutoMode = false; // Default ke mode manual
 
-// Buat query untuk mendapatkan 1 data terakhir berdasarkan key (timestamp)
-const latestSensorQuery = sensorDataRef.orderByKey().limitToLast(1);
-
-latestSensorQuery.on('value', (snapshot) => {
-  if (snapshot.exists()) {
-    console.log("--- Data SENSOR Terbaru Diterima ---");
-    
-    // Karena kita hanya mengambil 1 data, kita bisa loop untuk mendapatkannya
-    snapshot.forEach((childSnapshot) => {
-      const timestamp = childSnapshot.key; // Key-nya adalah timestamp
-      const data = childSnapshot.val();   // Val()-nya adalah objek data sensor
-      
-      // Tampilkan data ke konsol
-      console.log(`Timestamp: ${timestamp}`);
-      // Pastikan properti ada sebelum mengaksesnya untuk menghindari error
-      console.log(`  Temperature: ${data.temperature || 'N/A'}°C`);
-      console.log(`  Humidity: ${data.humidity || 'N/A'}%`);
-      console.log(`  Moisture: ${data.moisture || 'N/A'}%`);
-      console.log(`  Light: ${data.light || 'N/A'}`);
-    });
-    console.log("------------------------------------\n");
-
-  } else {
-    console.log("Tidak ada data sensor yang ditemukan.");
-  }
-}, (errorObject) => {
-  console.error("Gagal membaca data sensor:", errorObject);
-});
+// Definisikan pemetaan antara sensor dan pin aktuatornya
+const SENSOR_ACTUATOR_MAP = {
+    temperature: '16', // Suhu dikontrol oleh Kipas di pin 16
+    humidity: '17',    // Kelembapan dikontrol oleh Humidifier di pin 17
+    light: '18',       // Cahaya dikontrol oleh Lampu di pin 18
+    moisture: '19'     // Kelembapan media dikontrol oleh Pompa di pin 19
+};
 
 
-// ======================================================================
-// LISTENER 2: DATA AKTUATOR
-// ======================================================================
+// Listener untuk Mode Auto
+const modeRef = db.ref(`${UID}/mode/auto`);
+modeRef.on('value', (snapshot) => {
+    isAutoMode = snapshot.val();
+    console.log(`--- MODE KONTROL DIUBAH ---`);
+    console.log(`Mode Auto sekarang: ${isAutoMode ? 'AKTIF' : 'NON-AKTIF'}`);
+    console.log(`--------------------------\n`);
+}, (error) => console.error("Gagal membaca mode:", error));
 
-// Tentukan path ke node 'data' dari aktuator
-const aktuatorDataRef = db.ref(`${UID}/aktuator/data`);
 
-aktuatorDataRef.on('value', (snapshot) => {
-  if (snapshot.exists()) {
-    console.log("--- Data AKTUATOR Berubah ---");
-    const data = snapshot.val(); // Dapatkan seluruh objek data aktuator
-    
-    // Tampilkan seluruh objek status aktuator
-    console.log("Status Aktuator Saat Ini:", data);
-    
-    // Atau jika ingin menampilkannya satu per satu
-    // for (const key in data) {
-    //   console.log(`  Aktuator ${key}: Status ${data[key]}`);
-    // }
-
-    console.log("-----------------------------\n");
-  } else {
-    console.log("Tidak ada data aktuator yang ditemukan.");
-  }
-}, (errorObject) => {
-  console.error("Gagal membaca data aktuator:", errorObject);
-});
-
-// ======================================================================
-// LISTENER 3: DATA THRESHOLD
-// ======================================================================
-
+// Listener untuk Thresholds (menyimpan data ke variabel)
 const thresholdDataRef = db.ref(`${UID}/thresholds`);
-
 thresholdDataRef.on('value', (snapshot) => {
   if (snapshot.exists()) {
-    console.log("--- Data THRESHOLD Berubah ---");
-    const data = snapshot.val(); // Dapatkan seluruh objek threshold
-    
-    // Tampilkan seluruh objek threshold
-    console.log("Threshold Saat Ini:", data);
-    
-    console.log("-----------------------------\n");
+    currentThresholds = snapshot.val();
+    console.log("--- Data THRESHOLD Diperbarui ---");
+    console.log("Threshold Saat Ini:", currentThresholds);
+    console.log("-------------------------------\n");
   } else {
-    console.log("Tidak ada data threshold yang ditemukan.");
+    console.log("Tidak ada data threshold.");
   }
-}, (errorObject) => {
-  console.error("Gagal membaca data threshold:", errorObject);
+}, (error) => console.error("Gagal membaca data threshold:", error));
+
+
+// Listener untuk Aktuator (menyimpan data ke variabel)
+const aktuatorDataRef = db.ref(`${UID}/aktuator/data`);
+aktuatorDataRef.on('value', (snapshot) => {
+  if (snapshot.exists()) {
+    currentActuatorStates = snapshot.val();
+    console.log("--- Status AKTUATOR Diperbarui ---");
+    console.log("Status Aktuator Saat Ini:", currentActuatorStates);
+    console.log("--------------------------------\n");
+  } else {
+    console.log("Tidak ada data aktuator.");
+  }
+}, (error) => console.error("Gagal membaca data aktuator:", error));
+
+
+// Listener untuk Sensor (Pemicu & Logika Keputusan)
+const sensorDataRef = db.ref(`${UID}/sensor/data`);
+const latestSensorQuery = sensorDataRef.orderByKey().limitToLast(1);
+
+latestSensorQuery.on('child_added', (snapshot) => {
+  // Gunakan 'child_added' agar hanya terpicu saat ada data BARU
+  if (!snapshot.exists()) return;
+
+  const sensorData = snapshot.val();
+  console.log("--- Data SENSOR Baru Diterima ---", sensorData);
+
+  // Cek kondisi sebelum menjalankan logika
+  if (!isAutoMode) {
+    console.log("LOGIKA DITUNDA: Mode Auto tidak aktif.\n");
+    return;
+  }
+  if (!currentThresholds || !currentActuatorStates) {
+    console.log("LOGIKA DITUNDA: Data threshold atau aktuator belum siap.\n");
+    return;
+  }
+
+  // Objek untuk menampung perubahan yang perlu dikirim ke Firebase
+  const updates = {};
+
+  // --- Logika Suhu -> Kipas ---
+  const fanPin = SENSOR_ACTUATOR_MAP.temperature;
+  if (sensorData.temperature > currentThresholds.temperatureMax) {
+    // Jika suhu terlalu panas, dan kipas masih mati, nyalakan kipas
+    if (currentActuatorStates[fanPin] === 0) updates[fanPin] = 1;
+  } else if (sensorData.temperature < currentThresholds.temperatureMin) {
+    // Jika suhu sudah cukup dingin, dan kipas masih nyala, matikan kipas
+    if (currentActuatorStates[fanPin] === 1) updates[fanPin] = 0;
+  }
+
+  // --- Logika Kelembapan Udara -> Humidifier ---
+  const humidifierPin = SENSOR_ACTUATOR_MAP.humidity;
+  if (sensorData.humidity < currentThresholds.humidityMin) {
+    // Jika terlalu kering, nyalakan humidifier
+    if (currentActuatorStates[humidifierPin] === 0) updates[humidifierPin] = 1;
+  } else if (sensorData.humidity > currentThresholds.humidityMax) {
+    // Jika sudah cukup lembap, matikan humidifier
+    if (currentActuatorStates[humidifierPin] === 1) updates[humidifierPin] = 0;
+  }
+  
+  // --- Logika Cahaya -> Lampu ---
+  const lightPin = SENSOR_ACTUATOR_MAP.light;
+  if (sensorData.light < currentThresholds.lightMin) {
+    // Jika terlalu gelap, nyalakan lampu
+    if (currentActuatorStates[lightPin] === 0) updates[lightPin] = 1;
+  } else if (sensorData.light > currentThresholds.lightMax) {
+    // Jika sudah cukup terang, matikan lampu
+    if (currentActuatorStates[lightPin] === 1) updates[lightPin] = 0;
+  }
+
+  // --- Logika Kelembapan Media -> Pompa ---
+  const pumpPin = SENSOR_ACTUATOR_MAP.moisture;
+  if (sensorData.moisture < currentThresholds.moistureMin) {
+    // Jika media tanam kering, nyalakan pompa
+    if (currentActuatorStates[pumpPin] === 0) updates[pumpPin] = 1;
+  } else if (sensorData.moisture > currentThresholds.moistureMax) {
+    // Jika media sudah basah, matikan pompa
+    if (currentActuatorStates[pumpPin] === 1) updates[pumpPin] = 0;
+  }
+
+
+  // --- Aksi: Kirim update ke Firebase jika ada perubahan ---
+  if (Object.keys(updates).length > 0) {
+    console.log("AKSI: Terdeteksi kondisi di luar threshold, mengirim pembaruan:", updates);
+    aktuatorDataRef.update(updates)
+      .then(() => console.log("Update aktuator berhasil dikirim."))
+      .catch((error) => console.error("Gagal mengirim update aktuator:", error));
+  } else {
+    console.log("AKSI: Kondisi normal, tidak ada perubahan pada aktuator.");
+  }
+  console.log("----------------------------------\n");
 });
 
-
-console.log("Script berjalan. Mendengarkan perubahan data dari Firebase...");
+console.log("Script kontrol berjalan. Mendengarkan perubahan data dari Firebase...");
