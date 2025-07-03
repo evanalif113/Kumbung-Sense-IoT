@@ -92,43 +92,67 @@ function setupListenersForUser(uid) {
         var updates = {};
 
         // --- Logika Suhu -> Kipas ---
+        // Logika ini bertujuan untuk menjaga suhu DI ANTARA min dan max.
         var fanPin = SENSOR_ACTUATOR_MAP.temperature;
+        // Jika suhu terlalu panas (di atas max), NYALAKAN kipas untuk mendinginkan.
         if (sensorData.temperature > userState.currentThresholds.temperatureMax) {
-            // Jika suhu terlalu panas, dan kipas masih mati, nyalakan kipas
-            if (userState.currentActuatorStates[fanPin] === 0) updates[fanPin] = 1;
-        } else if (sensorData.temperature < userState.currentThresholds.temperatureMin) {
-            // Jika suhu sudah cukup dingin, dan kipas masih nyala, matikan kipas
-            if (userState.currentActuatorStates[fanPin] === 1) updates[fanPin] = 0;
+            if (userState.currentActuatorStates[fanPin] === 0) {
+                updates[fanPin] = 1; // Nyalakan Kipas
+            }
+        }
+        // Jika suhu terlalu dingin (di bawah min), MATIKAN kipas agar tidak semakin dingin.
+        if (sensorData.temperature < userState.currentThresholds.temperatureMin) {
+            if (userState.currentActuatorStates[fanPin] === 1) {
+                updates[fanPin] = 0; // Matikan Kipas
+            }
         }
 
         // --- Logika Kelembapan Udara -> Humidifier ---
+        // Tujuannya adalah menjaga kelembapan DI ANTARA min dan max.
         var humidifierPin = SENSOR_ACTUATOR_MAP.humidity;
+        // Jika udara terlalu kering (di bawah min), NYALAKAN humidifier.
         if (sensorData.humidity < userState.currentThresholds.humidityMin) {
-            // Jika terlalu kering, nyalakan humidifier
-            if (userState.currentActuatorStates[humidifierPin] === 0) updates[humidifierPin] = 1;
-        } else if (sensorData.humidity > userState.currentThresholds.humidityMax) {
-            // Jika sudah cukup lembap, matikan humidifier
-            if (userState.currentActuatorStates[humidifierPin] === 1) updates[humidifierPin] = 0;
+            if (userState.currentActuatorStates[humidifierPin] === 0) {
+                updates[humidifierPin] = 1; // Nyalakan Humidifier
+            }
+        }
+        // Jika udara terlalu lembap (di atas max), MATIKAN humidifier.
+        if (sensorData.humidity > userState.currentThresholds.humidityMax) {
+            if (userState.currentActuatorStates[humidifierPin] === 1) {
+                updates[humidifierPin] = 0; // Matikan Humidifier
+            }
         }
         
         // --- Logika Cahaya -> Lampu ---
+        // Tujuannya adalah menjaga tingkat cahaya DI ANTARA min dan max.
         var lightPin = SENSOR_ACTUATOR_MAP.light;
+        // Jika terlalu gelap (di bawah min), NYALAKAN lampu.
         if (sensorData.light < userState.currentThresholds.lightMin) {
-            // Jika terlalu gelap, nyalakan lampu
-            if (userState.currentActuatorStates[lightPin] === 0) updates[lightPin] = 1;
-        } else if (sensorData.light > userState.currentThresholds.lightMax) {
-            // Jika sudah cukup terang, matikan lampu
-            if (userState.currentActuatorStates[lightPin] === 1) updates[lightPin] = 0;
+            if (userState.currentActuatorStates[lightPin] === 0) {
+                updates[lightPin] = 1; // Nyalakan Lampu
+            }
+        }
+        // Jika terlalu terang (di atas max), MATIKAN lampu.
+        if (sensorData.light > userState.currentThresholds.lightMax) {
+            if (userState.currentActuatorStates[lightPin] === 1) {
+                updates[lightPin] = 0; // Matikan Lampu
+            }
         }
 
         // --- Logika Kelembapan Media -> Pompa ---
+        // Tujuannya adalah menjaga kelembapan media DI ANTARA min dan max.
         var pumpPin = SENSOR_ACTUATOR_MAP.moisture;
+        // Jika media terlalu kering (di bawah min), NYALAKAN pompa.
         if (sensorData.moisture < userState.currentThresholds.moistureMin) {
-            // Jika media tanam kering, nyalakan pompa
-            if (userState.currentActuatorStates[pumpPin] === 0) updates[pumpPin] = 1;
-        } else if (sensorData.moisture > userState.currentThresholds.moistureMax) {
-            // Jika media sudah basah, matikan pompa
-            if (userState.currentActuatorStates[pumpPin] === 1) updates[pumpPin] = 0;
+            if (userState.currentActuatorStates[pumpPin] === 0) {
+                updates[pumpPin] = 1; // Nyalakan Pompa
+            }
+        }
+        // Jika media terlalu basah (di atas max), MATIKAN pompa.
+        if (sensorData.moisture > userState.currentThresholds.moistureMax) {
+            if (userState.currentActuatorStates[pumpPin] === 1) {
+                updates[pumpPin] = 0; // Matikan Pompa
+            }
         }
 
         // --- Aksi: Kirim update ke Firebase jika ada perubahan ---
