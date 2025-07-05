@@ -58,3 +58,12 @@ CREATE TABLE IF NOT EXISTS LOG_AKTUATOR (
     status ENUM('on', 'off') NOT NULL,
     FOREIGN KEY (id_aktuator) REFERENCES AKTUATOR(id_aktuator) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS NOTIFIKASI (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_pengguna INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    message TEXT NOT NULL,
+    status ENUM('unread', 'read') DEFAULT 'unread',
+    FOREIGN KEY (id_pengguna) REFERENCES PENGGUNA(id_pengguna) ON DELETE CASCADE
+);
