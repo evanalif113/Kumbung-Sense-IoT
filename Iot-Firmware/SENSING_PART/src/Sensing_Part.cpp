@@ -1,6 +1,6 @@
 //#define USE_SQL
 #define USE_FIREBASE
-#define USE_BH1750
+//#define USE_BH1750
 #define USE_SHT31
 //#define USE_OLED
 //#define USE_DEBUG
@@ -52,8 +52,8 @@ String ServerPath = "http://192.168.1.101:2518/api/data-sensor/send";
 
 #define API_KEY "AIzaSyD14wZkvP46yP3jQAwzUBOSh9kf8m-7vwg"
 #define DATABASE_URL "https://kumbung-sense-default-rtdb.asia-southeast1.firebasedatabase.app/"
-#define USER_EMAIL "esp32@gmail.com"
-#define USER_PASSWORD "1234567"
+#define USER_EMAIL "Guest@mail.com"
+#define USER_PASSWORD "guest12345"
 
 // Pin dan LED indicator
 // uint8_t ledPin = 2; // GPIO 2 //
