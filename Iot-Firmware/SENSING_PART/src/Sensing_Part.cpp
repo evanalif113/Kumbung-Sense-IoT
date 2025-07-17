@@ -1,8 +1,8 @@
 //#define USE_SQL
 #define USE_FIREBASE
-//#define USE_BH1750
+#define USE_BH1750
 #define USE_SHT31
-//#define USE_OLED
+#define USE_OLED
 //#define USE_DEBUG
 #define ENABLE_USER_AUTH
 #define ENABLE_DATABASE
@@ -364,7 +364,7 @@ void connectWiFi() {
   // wm.setShowStaticFields(true); // force show static ip fields
   // wm.setShowDnsFields(true);    // force show dns field always
 
-  // wm.setConnectTimeout(20); // how long to try to connect for before continuing
+  wm.setConnectTimeout(20); // how long to try to connect for before continuing
   //wm.setConfigPortalTimeout(30); // auto close configportal after n seconds
   // wm.setCaptivePortalEnable(false); // disable captive portal redirection
   wm.setAPClientCheck(true); // avoid timeout if client connected to softap
