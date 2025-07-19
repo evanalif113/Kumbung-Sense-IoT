@@ -20,6 +20,35 @@ var SENSOR_ACTUATOR_MAP = {
     moisture: '19'     // Kelembapan media dikontrol oleh Pompa di pin 19
 };
 
+// Peta untuk mendapatkan nama aktuator dari pin untuk notifikasi
+var ACTUATOR_PIN_TO_NAME_MAP = {
+    '16': 'Kipas',
+    '17': 'Humidifier',
+    '18': 'Lampu',
+    '19': 'Pompa'
+};
+
+// Fungsi untuk mengirim notifikasi ke Firebase
+function sendNotification(uid, message) {
+    var timestamp = Date.now();
+    var notificationsRef = db.ref(uid + '/notifications');
+
+    var newNotification = {
+        message: message,
+        read: false,
+        timestamp: timestamp
+    };
+
+    // Gunakan timestamp sebagai kunci untuk notifikasi baru
+    notificationsRef.child(timestamp).set(newNotification)
+        .then(function() {
+            console.log('[' + uid + '] Notifikasi berhasil dikirim: ' + message);
+        })
+        .catch(function(error) {
+            console.error('[' + uid + '] Gagal mengirim notifikasi:', error);
+        });
+}
+
 // Fungsi untuk mengatur listener untuk setiap pengguna
 function setupListenersForUser(uid) {
     console.log('Mengatur listener untuk UID: ' + uid);
@@ -159,8 +188,21 @@ function setupListenersForUser(uid) {
         if (Object.keys(updates).length > 0) {
             console.log('[' + uid + '] AKSI: Terdeteksi kondisi di luar threshold, mengirim pembaruan:', updates);
             aktuatorDataRef.update(updates)
-                .then(function() { console.log('[' + uid + '] Update aktuator berhasil dikirim.'); })
-                .catch(function(error) { console.error('[' + uid + '] Gagal mengirim update aktuator:', error); });
+                .then(function() {
+                    console.log('[' + uid + '] Update aktuator berhasil dikirim.');
+                    // Kirim notifikasi untuk setiap perubahan aktuator
+                    for (var pin in updates) {
+                        if (Object.prototype.hasOwnProperty.call(updates, pin)) {
+                            var status = updates[pin] === 1 ? 'dinyalakan' : 'dimatikan';
+                            var actuatorName = ACTUATOR_PIN_TO_NAME_MAP[pin] || 'Aktuator tidak dikenal';
+                            var message = actuatorName + ' ' + status + '.';
+                            sendNotification(uid, message);
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    console.error('[' + uid + '] Gagal mengirim update aktuator:', error);
+                });
         } else {
             console.log('[' + uid + '] AKSI: Kondisi normal, tidak ada perubahan pada aktuator.');
         }
